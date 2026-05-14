@@ -242,3 +242,143 @@ PBDS 的核心是“策略”（Policy），你可以像搭积木一样组合它
 - **便于前缀搜索的 Trie**。
 
 只需包含对应头文件，便可在 GCC 环境中直接使用，比手写平衡树功能更强大、可靠性更高。对于大多数日常需求，推荐用 `tree` 解决排名问题，用 `gp_hash_table` 加速查找，用 `pairing_heap` 或 `binomial_heap` 管理动态变化的优先级。
+
+
+
+
+
+
+`ext/pb_ds` 中的容器严格遵循标准 C++ 容器和关联容器的接口要求，所以你通常能找到 `size()`、`empty()`、`clear()`、`find()`、`count()`、`lower_bound()`、`upper_bound()`、`equal_range()`、`swap()` 以及所有迭代器函数。下面列出的都是这些常规函数 **之外** 的、PBDS 特有的或需要特别留意的操作。
+
+---
+
+## 1. 树（`tree`）特有的函数
+
+**顺序统计策略 `tree_order_statistics_node_update` 开启后**：
+
+| 函数 | 说明 |
+|------|------|
+| `iterator find_by_order(size_type order)` | 返回排名为 `order`（第 k 小的元素，索引从 0 开始）的迭代器 |
+| `size_type order_of_key(const_key_reference r_key)` | 返回严格小于 `r_key` 的元素个数，即 `r_key` 的排名 |
+| `node_begin()` / `node_end()` | 遍历容器元节点（一般不需要） |
+| `join(tree &other)` | 将另一棵树的 **全部元素** 合并到当前树，前提是所有元素必须严格在另一棵树与当前树之间（即 `other` 中的最大元素 ≤ 当前树的最小元素，或反之，取决于比较器） |
+| `split(const_key_reference r_key, tree &other)` | 将大于等于 `r_key` 的元素移动到 `other` 中，自己保留小于 `r_key` 的元素。要求 `other` 为空。注意关联容器一般不提供 O(log n) 的分裂，这是 PBDS 的特有功能。 |
+
+**示例**：
+```cpp
+ordered_set X, Y;
+X.insert(1); X.insert(3); X.insert(5);
+Y.insert(2); Y.insert(4);
+
+// 合并，调用前必须保证所有元素处于正确的序关系
+X.join(Y);   // now X = {1,2,3,4,5}, Y 为空
+
+X.split(4, Y); // X = {1,2,3}, Y = {4,5}
+```
+
+> ⚠️ `join` 和 `split` 需要确保树满足谓词顺序，否则行为未定义。红黑树支持这两个操作，splay 树不支持。
+
+---
+
+## 2. 哈希表（`gp_hash_table` / `cc_hash_table`）特有的函数
+
+除了标准的 `operator[]`、`insert`、`erase`、`find`、`count` 之外，PBDS 哈希表暴露了底层的桶接口，用于调优和调试：
+
+| 函数 | 说明 |
+|------|------|
+| `size_type get_actual_size() const` | 返回分配的总桶数（或实际表格大小） |
+| `size_type get_num_used_entries() const` | 返回已使用的桶数（非空桶） |
+| `void resize(size_type n)` | 重新哈希到至少 `n` 个桶 |
+| `void erase(iterator it)` | 删除迭代器所指元素，与标准相同，但需要注意探测法表中的迭代器失效规则 |
+| `void clear()` | 清空表 |
+
+探测法（`gp`）还提供：
+
+| 函数 | 说明 |
+|------|------|
+| `void erase_if(Predicate pred)` | 移除所有满足谓词的元素（C++20 风格，但很早就有）？实际 PBDS 的 `gp_hash_table` 有一个内部 `erase_if`，但建议直接遍历并删除。这里以具体实现为准。 |
+
+对于分离链接法（`cc`），还有：
+
+| 函数 | 说明 |
+|------|------|
+| `bucket_size_type get_bucket_size(size_type n) const` | 获取第 `n` 个桶中元素个数 |
+| `size_type get_bucket(const_key_reference r_key) const` | 获取键所落的桶索引 |
+
+大多数情况下这些函数不需要直接使用，但在写自定义策略或性能测试时有用。
+
+---
+
+## 3. 优先队列（`priority_queue`）特有的函数
+
+除了 `push`、`pop`、`top`、`size`、`empty` 外，PBDS 的堆支持迭代器语义和高级操作：
+
+| 函数 | 说明 |
+|------|------|
+| `iterator push(const_reference r_val)` | 插入元素并返回指向该元素的迭代器，后续可用于 `modify` 或 `erase` |
+| `void modify(iterator it, const_reference r_new_val)` | 修改迭代器所指元素的值，并自动重新维护堆序 |
+| `void erase(iterator it)` | 删除迭代器所指元素，并调整堆 |
+| `void join(priority_queue &other)` | 合并另一个优先队列到当前队列，`other` 被清空，合并后仍然保持堆性质 |
+| `void split(Pred prd, priority_queue &other)` | 将所有满足谓词 `prd` 的元素移动到 `other` 中。谓词应接受 `const_reference`，返回 `bool` |
+| `const_iterator begin() const` | 返回一个只读迭代器，可用于遍历所有元素（顺序不受堆序保证） |
+
+> ⚠️ 只有 `binary_heap_tag` 不支持 `modify`、`erase` 和迭代器语义（它类似 STL 的优先队列），其他标签（`pairing_heap_tag`、`binomial_heap_tag`、`thin_heap_tag`、`rc_binomial_heap_tag`）均支持。
+
+**示例**：
+```cpp
+typedef __gnu_pbds::priority_queue<int, std::less<int>, binomial_heap_tag> pq_t;
+pq_t pq1, pq2;
+auto it = pq1.push(10);
+pq1.push(20);
+pq2.push(5);
+
+pq1.modify(it, 30);    // it 原指向 10，现在变成 30，堆顶变为 30
+pq1.join(pq2);         // pq1 包含 {5,20,30}，pq2 为空
+
+pq1.split([](int x) { return x < 15; }, pq2);  // pq1 剩余 >=15 的，pq2 得到 <15 的
+```
+
+---
+
+## 4. Trie（`trie`）特有的函数
+
+除了 `insert`、`find`、`erase` 等关联操作，`trie` 提供强大的前缀查询：
+
+| 函数 | 说明 |
+|------|------|
+| `std::pair<iterator, iterator> prefix_range(const_key_reference r_key)` | 返回一对迭代器，表示所有以 `r_key` 为前缀的元素范围。第一个迭代器指向第一个匹配的元素，第二个迭代器指向最后一个匹配元素的下一个位置 |
+| `void insert(iterator hint, const_reference r_val)` | 带提示的插入，但不太常用 |
+| `node_begin()` / `node_end()` | 遍历 trie 的内部节点 |
+
+对于自定义 `trie_prefix_search_node_update` 的 trie，还有：
+
+| 函数 | 说明 |
+|------|------|
+| `void erase_if(Predicate pred)` | （可能支持）条件删除，通常手动循环 `erase` 更可控 |
+
+**二进制键 trie**（用 `trie_binary_access_traits`）用法同理，`prefix_range` 可以查找所有以某个二进制前缀开头的数据。
+
+---
+
+## 5. 其他策略暴露的小工具函数
+
+- **树和 trie**：`get_node_allocator()` 获取节点分配器，用于高级内存管理。
+- **树**：`void erase(const_iterator it)` / `iterator erase(iterator it)` 标准但容易忘。
+- **所有容器**：PBDS 的迭代器通常提供 `operator->` 和 `operator*` 与标准完全一致。
+
+---
+
+## 总结：你可能忽视但很实用的函数
+
+| 容器 | 函数 | 用途 |
+|------|------|------|
+| 树 | `join` | O(n) 合并两棵树 |
+| 树 | `split` | O(n) 按键分裂 |
+| 堆 | `modify` / `erase` | 动态更新优先级，无需重复 push/pop |
+| 堆 | `join` / `split` | 合并两个队列，或按条件拆分 |
+| Trie | `prefix_range` | 一次拿到所有特定前缀的元素 |
+| 哈希表 | `resize` / `get_actual_size` | 调整桶数，避免重哈希开销 |
+
+这些函数是 PBDS 相对标准库最明显的“增值”部分。如果你在使用中需要某个功能但不确定是否有对应函数，最可靠的方法是查阅 GCC 源码目录下的 `ext/pb_ds` 或直接阅读头文件——它们的接口通常提供与 STL 一致的命名风格。
+
+如果你有具体的使用场景想进一步优化，可以告诉我，我可以给出更针对性的建议。

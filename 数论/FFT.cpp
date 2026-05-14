@@ -30,8 +30,7 @@ ll n, m, c[N], limit = 1, l = 0;
 struct Complex {
     double real, imag;
 
-    Complex() {
-    }
+    Complex() {}
 
     template<typename T, typename Z>
     inline Complex(T REAL, Z IMAG) { real = REAL, imag = IMAG; }

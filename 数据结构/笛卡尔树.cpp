@@ -1,3 +1,82 @@
-//
-// Created by 黄江易 on 2026/5/14.
-//
+#include<bits/stdc++.h>
+using namespace std;
+
+// #include<bits/extc++.h>
+// using namespace __gnu_cxx;
+
+
+#define rep(i, l, r) for(ll i = (l); i <= (r); i++)
+#define per(i, r, l) for(ll i = (r); i >= (l); i--)
+
+#define all(a) a.begin(), a.end()
+#define all1(a) a.begin() + 1, a.end()
+
+typedef long long ll;
+typedef long long i64;
+typedef pair<ll, ll> pll;
+
+
+template<typename T, typename Z>
+inline void chkmax(T &x, const Z &y) { x = x > y ? x : y; }
+
+template<typename T, typename Z>
+inline void chkmin(T &x, const Z &y) { x = x < y ? x : y; }
+
+
+
+bool Mbe;
+const ll N = 2e6 + 10, M = 360 + 10, mod = 998'244'353;
+ll n, k, m, x, y, q, h, p;
+
+void init() {
+
+}
+
+
+// #define DEBUG
+#define SYNC
+// #define MULTI
+
+inline void solve() {
+    cin >> n ;
+    vector<ll> a(n + 1), ls(n + 1), rs(n + 1), sta(n + 1);
+    ll top = 0;
+    rep(i, 1, n) cin >> a[i];
+    rep(i, 1, n) {
+        while (top && a[sta[top]] > a[i]) top--;
+        if (top == 0) ls[i] = sta[top + 1];
+        else ls[i] = rs[sta[top]], rs[sta[top]] = i;
+        sta[++top] = i;
+    }
+
+    ll ans1 = 0, ans2 = 0;
+    rep(i, 1, n) {
+        ans1 ^= i * (ls[i] + 1);
+        ans2 ^= i * (rs[i] + 1);
+    }
+    cout << ans1 << " " << ans2 << endl;
+}
+
+bool Med;
+
+
+int main() {
+#ifdef SYNC
+    ios::sync_with_stdio(0);
+    cin.tie(0), cout.tie(0);
+#endif
+    ll q = 1, clk1 = clock();
+
+#ifdef MULTI
+    cin >> q;
+#endif
+    init();
+    while (q--) {
+        solve();
+    }
+#ifdef DEBUG
+    cerr << ((&Med - &Mbe) / 1024.0 / 1024.0) << " Mb" << endl;
+    cerr << ((clock() - clk1) * 1000.0 / CLOCKS_PER_SEC ) << " Ms" << endl;
+#endif
+    return 0;
+}
