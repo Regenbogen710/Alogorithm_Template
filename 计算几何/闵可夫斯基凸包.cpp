@@ -58,8 +58,6 @@ inline void convexhull(Point *point, Point *hull, ll &cnt, ll n) {
         while (((hull[cnt] - hull[cnt - 1]) & (point[i] - hull[cnt])) <= 0 && cnt > k)cnt--;
         hull[++cnt] = point[i];
     }
-    //    for(ll i=1;i<=cnt;i++)hull[i].write();
-    //    cout<<"#########\n";
 }
 
 struct Hull {
